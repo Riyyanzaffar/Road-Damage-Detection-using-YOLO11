@@ -8,104 +8,114 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER
-from reportlab.lib.units import inch
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Image as PDFImage,
-    Table, TableStyle, KeepTogether
-)
-
-# ---------------- PAGE CONFIG ----------------
+# ---------------- PAGE SETTINGS ----------------
 
 st.set_page_config(
     page_title="Road Damage AI",
     page_icon="🚧",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# ---------------- CUSTOM DESIGN ----------------
+MODEL_PATH = Path(__file__).parent / "best (3).pt"
+
+# ---------------- PROFESSIONAL LIGHT/DARK-BLUE DESIGN ----------------
 
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(135deg, #071426 0%, #0b1930 55%, #102541 100%);
-    color: #f1f5f9;
+    background: #f2f6fc;
+    color: #20344d;
+}
+[data-testid="stHeader"] {
+    background: #f2f6fc;
 }
 [data-testid="stSidebar"] {
-    background-color: #081323;
-    border-right: 1px solid #223b59;
+    background: #e3edf8;
+    border-right: 1px solid #c5d6e8;
 }
 .block-container {
+    max-width: 1450px;
     padding-top: 2rem;
     padding-bottom: 3rem;
-    max-width: 1450px;
 }
 .hero {
-    background: linear-gradient(120deg, #102b4c, #123d61);
-    padding: 28px;
+    background: linear-gradient(120deg, #14365b, #23658b);
+    padding: 30px;
     border-radius: 18px;
-    border: 1px solid #285477;
     margin-bottom: 24px;
+    border: 1px solid #427da5;
 }
 .hero h1 {
-    color: #ffffff;
+    color: #ffffff !important;
     font-size: 34px;
-    margin-bottom: 8px;
+    margin: 0 0 8px 0;
 }
 .hero p {
-    color: #c5d7e9;
+    color: #e8f3ff !important;
     font-size: 16px;
+    margin: 0;
 }
 .section-title {
-    color: #dbeafe;
-    font-size: 21px;
-    font-weight: 700;
-    margin: 15px 0;
+    color: #173e65 !important;
+    font-size: 22px;
+    font-weight: 750;
+    margin: 18px 0 12px 0;
 }
 div[data-testid="stMetric"] {
-    background: #10233b;
-    border: 1px solid #254564;
-    padding: 18px;
+    background: #ffffff;
+    border: 1px solid #d4e0ed;
     border-radius: 14px;
+    padding: 17px;
+    box-shadow: 0 3px 12px rgba(20, 54, 91, 0.05);
 }
 div[data-testid="stMetricLabel"] {
-    color: #b7cbe0;
+    color: #526981 !important;
+}
+div[data-testid="stMetricValue"] {
+    color: #163d64 !important;
 }
 .stButton > button {
-    background: #1685e8;
+    background: #1769aa;
     color: white;
-    border: 0;
+    border: 1px solid #1769aa;
     border-radius: 10px;
     min-height: 45px;
     font-weight: 700;
 }
 .stButton > button:hover {
-    background: #086bc2;
+    background: #10558d;
     color: white;
-    border: 1px solid #64b5ff;
+    border-color: #10558d;
 }
 div[data-testid="stDownloadButton"] button {
-    background: #123b36;
-    color: #d1fae5;
-    border: 1px solid #247d68;
+    background: #e1f2ff;
+    color: #174b73;
+    border: 1px solid #9bc8e7;
     border-radius: 10px;
-    min-height: 42px;
+    min-height: 43px;
+    font-weight: 650;
 }
 div[data-testid="stFileUploader"] {
-    background: #0d2036;
-    padding: 14px;
-    border: 1px dashed #426586;
+    background: #ffffff;
+    border: 1px dashed #9db5cd;
     border-radius: 12px;
+    padding: 12px;
+}
+div[data-testid="stFileUploader"] label,
+div[data-testid="stFileUploader"] small {
+    color: #263f59 !important;
+}
+.stMarkdown, .stCaption, label, li {
+    color: #263f59;
+}
+h1, h2, h3, h4, h5 {
+    color: #173e65;
 }
 hr {
-    border-color: #25415f;
+    border-color: #cfdeed;
 }
 .small-note {
-    color: #9fb4cb;
+    color: #536b82;
     font-size: 13px;
 }
 </style>
@@ -113,132 +123,150 @@ hr {
 
 # ---------------- LOAD MODEL ----------------
 
-MODEL_PATH = Path(__file__).parent / "best (3).pt"
-
 @st.cache_resource
 def load_model():
-    if not MODEL_PATH.exists():
+    if not MODEL_PATH.is_file():
         raise FileNotFoundError(
-            f"Model file nahi mili: {MODEL_PATH.name}. "
-            "Is file ko app.py ke saath same folder mein upload karein."
+            "Model file nahi mili. 'best (3).pt' ko app.py ke saath "
+            "GitHub ke same folder mein upload karein."
         )
     return YOLO(str(MODEL_PATH))
 
-# ---------------- PDF REPORT ----------------
+# ---------------- CREATE PDF REPORT ----------------
 
 def create_pdf_report(analysis):
+    # PDF library sirf report banate waqt load hogi.
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.units import inch
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer,
+        Image as PDFImage, Table, TableStyle
+    )
+
     buffer = BytesIO()
 
-    doc = SimpleDocTemplate(
+    document = SimpleDocTemplate(
         buffer,
         pagesize=A4,
         rightMargin=38,
         leftMargin=38,
-        topMargin=38,
-        bottomMargin=38
+        topMargin=35,
+        bottomMargin=35
     )
 
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(
-        name="ReportTitle",
+        name="RoadTitle",
         parent=styles["Title"],
-        fontSize=23,
-        leading=28,
+        fontSize=21,
+        leading=27,
         alignment=TA_CENTER,
-        textColor=colors.HexColor("#12365a"),
-        spaceAfter=10
+        textColor=colors.HexColor("#173e65"),
+        spaceAfter=12
     ))
     styles.add(ParagraphStyle(
-        name="SectionHeading",
+        name="RoadHeading",
         parent=styles["Heading2"],
-        textColor=colors.HexColor("#155e75"),
+        fontSize=14,
+        textColor=colors.HexColor("#1769aa"),
         spaceBefore=14,
         spaceAfter=8
     ))
 
+    detections = analysis["detections"]
+    summary = analysis["summary"]
+    count = len(detections)
+    average = (
+        sum(item["confidence_value"] for item in detections) / count
+        if count else 0
+    )
+
     story = [
-        Paragraph("ROAD DAMAGE DETECTION REPORT", styles["ReportTitle"]),
+        Paragraph("ROAD DAMAGE AI REPORT", styles["RoadTitle"]),
         Paragraph(
-            f"Generated: {datetime.now().strftime('%d %B %Y, %I:%M %p')}",
+            "Generated: " + datetime.now().strftime("%d %B %Y, %I:%M %p"),
             styles["Normal"]
         ),
         Spacer(1, 14),
-        Paragraph("Analysis Summary", styles["SectionHeading"])
+        Paragraph("Analysis Summary", styles["RoadHeading"])
     ]
 
-    detections = analysis["detections"]
-    total = len(detections)
-    avg_conf = (
-        sum(item["Confidence Value"] for item in detections) / total
-        if total else 0
-    )
-
-    summary_data = [
+    summary_table_data = [
         ["Metric", "Result"],
-        ["Total detections", str(total)],
-        ["Damage classes found", str(len(analysis["summary"]))],
-        ["Average confidence", f"{avg_conf:.2%}"]
+        ["Total detections", str(count)],
+        ["Different damage classes", str(len(summary))],
+        ["Average detection confidence", f"{average:.2%}"],
+        ["Confidence threshold used", f'{analysis["threshold"]:.2f}']
     ]
 
-    summary_table = Table(summary_data, colWidths=[250, 230])
+    summary_table = Table(summary_table_data, colWidths=[3.4 * inch, 2.6 * inch])
     summary_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#12365a")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#173e65")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#b7c8d8")),
-        ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f1f6fa")),
-        ("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#15283b")),
-        ("PADDING", (0, 0), (-1, -1), 8),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#eff6fc")),
+        ("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#20344d")),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#c6d6e6")),
+        ("PADDING", (0, 0), (-1, -1), 7)
     ]))
     story.append(summary_table)
 
-    story.append(Paragraph("Damage Class Breakdown", styles["SectionHeading"]))
+    story.append(Paragraph("Damage Class Breakdown", styles["RoadHeading"]))
 
-    class_data = [["Damage Class", "Count", "Average Confidence"]]
-    for item in analysis["summary"]:
+    class_data = [["Damage class", "Count", "Avg. confidence"]]
+    for item in summary:
         class_data.append([
-            item["Damage Class"],
-            str(item["Count"]),
-            f'{item["Average Confidence"]:.2%}'
+            item["damage_class"],
+            str(item["count"]),
+            f'{item["average_confidence"]:.2%}'
         ])
 
-    if not analysis["summary"]:
-        class_data.append(["No damage detected", "0", "N/A"])
+    if not summary:
+        class_data.append(["No detections", "0", "N/A"])
 
-    class_table = Table(class_data, colWidths=[230, 80, 170], repeatRows=1)
+    class_table = Table(
+        class_data,
+        colWidths=[3.2 * inch, 1.0 * inch, 1.8 * inch],
+        repeatRows=1
+    )
     class_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#155e75")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1769aa")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#b7c8d8")),
-        ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f1f6fa")),
-        ("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#15283b")),
-        ("PADDING", (0, 0), (-1, -1), 7),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#eff6fc")),
+        ("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#20344d")),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#c6d6e6")),
+        ("PADDING", (0, 0), (-1, -1), 7)
     ]))
     story.append(class_table)
 
-    story.append(Paragraph("Detected Road Image", styles["SectionHeading"]))
+    story.append(Paragraph("Detected Image", styles["RoadHeading"]))
 
-    detected_image = Image.open(BytesIO(analysis["image_bytes"])).convert("RGB")
+    detected_image = Image.open(
+        BytesIO(analysis["image_bytes"])
+    ).convert("RGB")
+    detected_image.thumbnail((1100, 650))
+
     image_buffer = BytesIO()
     detected_image.save(image_buffer, format="JPEG", quality=88)
     image_buffer.seek(0)
 
-    max_width = 500
-    image_height = max_width * detected_image.height / detected_image.width
     pdf_image = PDFImage(
         image_buffer,
-        width=max_width,
-        height=image_height
+        width=6.4 * inch,
+        height=6.4 * inch * detected_image.height / detected_image.width
     )
     story.append(pdf_image)
 
-    story.append(Paragraph("Detection Details", styles["SectionHeading"]))
+    story.append(Paragraph("Individual Detections", styles["RoadHeading"]))
 
-    detail_data = [["#", "Damage Class", "Confidence"]]
+    detail_data = [["#", "Damage class", "Confidence"]]
     for index, item in enumerate(detections[:100], start=1):
         detail_data.append([
             str(index),
-            item["Damage Class"],
-            f'{item["Confidence Value"]:.2%}'
+            item["damage_class"],
+            f'{item["confidence_value"]:.2%}'
         ])
 
     if not detections:
@@ -246,42 +274,43 @@ def create_pdf_report(analysis):
 
     detail_table = Table(
         detail_data,
-        colWidths=[40, 300, 140],
+        colWidths=[0.5 * inch, 3.8 * inch, 1.7 * inch],
         repeatRows=1
     )
     detail_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#12365a")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#173e65")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#b7c8d8")),
-        ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f1f6fa")),
-        ("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#15283b")),
-        ("PADDING", (0, 0), (-1, -1), 6),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#eff6fc")),
+        ("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#20344d")),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#c6d6e6")),
+        ("PADDING", (0, 0), (-1, -1), 6)
     ]))
     story.append(detail_table)
 
     if len(detections) > 100:
         story.append(Spacer(1, 8))
         story.append(Paragraph(
-            "Note: Report mein pehli 100 detections ki details dikhayi gayi hain. "
+            "Note: Is PDF mein pehli 100 individual detections hain. "
             "Summary mein tamam detections shamil hain.",
             styles["Normal"]
         ))
 
-    story.append(Spacer(1, 16))
+    story.append(Spacer(1, 12))
     story.append(Paragraph(
-        "Note: Confidence model ka estimate hai, guaranteed accuracy ya "
-        "professional road-safety inspection ka replacement nahi.",
-        styles["Italic"]
+        "Disclaimer: Confidence model ka estimate hai, guaranteed accuracy "
+        "nahi. Is report ko professional road inspection ka replacement "
+        "na samjhein.",
+        styles["Normal"]
     ))
 
-    doc.build(story)
+    document.build(story)
     buffer.seek(0)
     return buffer.getvalue()
 
 # ---------------- SIDEBAR ----------------
 
 with st.sidebar:
-    st.markdown("## ROAD AI")
+    st.markdown("## ROAD DAMAGE AI")
     st.caption("Computer Vision • YOLO")
     st.divider()
 
@@ -292,19 +321,21 @@ with st.sidebar:
         max_value=0.75,
         value=0.10,
         step=0.05,
-        help="Kam threshold par zyada detections aa sakti hain, lekin false detections bhi barh sakti hain."
+        help=(
+            "Agar detections nahi aa rahi to 0.05 try karein. "
+            "Threshold kam karne se false detections bhi aa sakti hain."
+        )
     )
 
-    st.divider()
+    st.markdown("---")
     st.markdown("### How to use")
     st.write("1. Road image upload karein.")
-    st.write("2. Detect button dabayein.")
-    st.write("3. Results aur damage summary dekhein.")
+    st.write("2. Run Detection dabayein.")
+    st.write("3. Image aur damage summary dekhein.")
     st.write("4. Image ya PDF report download karein.")
 
     st.divider()
-    st.caption("Model: best (3).pt")
-    st.caption("Detection quality image aur training data par depend karti hai.")
+    st.caption("Model file: best (3).pt")
 
 # ---------------- HEADER ----------------
 
@@ -315,107 +346,120 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ---------------- MODEL CHECK ----------------
+
 try:
     model = load_model()
 except Exception as error:
     st.error(f"Model load nahi hua: {error}")
     st.info(
-        "Confirm karein ke best (3).pt aur app.py GitHub repository ke "
-        "same folder mein hain."
+        "Check karein ke 'best (3).pt' file, app.py ke same folder mein "
+        "GitHub par uploaded hai."
     )
     st.stop()
 
-# ---------------- IMAGE UPLOAD ----------------
+# ---------------- UPLOAD IMAGE ----------------
 
-st.markdown('<div class="section-title">Upload Road Image</div>',
-            unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-title">Upload Road Image</div>',
+    unsafe_allow_html=True
+)
 
 uploaded_file = st.file_uploader(
-    "Road ki JPG, JPEG ya PNG image select karein",
+    "Road ki JPG, JPEG ya PNG image upload karein",
     type=["jpg", "jpeg", "png"]
 )
 
 if uploaded_file is None:
-    st.info("Shuru karne ke liye road ki image upload karein.")
-    st.markdown("""
-    <div class="small-note">
-    Supported formats: JPG, JPEG, PNG
-    </div>
-    """, unsafe_allow_html=True)
+    st.info("Detection shuru karne ke liye road image upload karein.")
+    st.markdown(
+        '<p class="small-note">Supported formats: JPG, JPEG, PNG</p>',
+        unsafe_allow_html=True
+    )
     st.stop()
 
-original_bytes = uploaded_file.getvalue()
-image = Image.open(BytesIO(original_bytes)).convert("RGB")
+try:
+    original_bytes = uploaded_file.getvalue()
+    image = Image.open(BytesIO(original_bytes)).convert("RGB")
+except Exception:
+    st.error("Image open nahi ho saki. Doosri JPG ya PNG image try karein.")
+    st.stop()
 
-# New image upload hone par purana result clear karein
-if st.session_state.get("current_upload") != original_bytes:
-    st.session_state["current_upload"] = original_bytes
+# Nayi image upload hone par purana result remove karein
+if st.session_state.get("upload_signature") != (
+    uploaded_file.name, len(original_bytes), original_bytes[:100]
+):
+    st.session_state["upload_signature"] = (
+        uploaded_file.name, len(original_bytes), original_bytes[:100]
+    )
     st.session_state.pop("analysis", None)
 
-preview_left, preview_right = st.columns([1, 1])
+left, right = st.columns(2)
 
-with preview_left:
+with left:
     st.markdown("#### Original Image")
     st.image(image, use_container_width=True)
 
-with preview_right:
-    st.markdown("#### Image Information")
-    st.metric("Image Width", f"{image.width} px")
-    st.metric("Image Height", f"{image.height} px")
-    st.caption(f"File: {uploaded_file.name}")
+with right:
+    st.markdown("#### Image Details")
+    st.metric("Width", f"{image.width} px")
+    st.metric("Height", f"{image.height} px")
+    st.caption(f"Filename: {uploaded_file.name}")
+
+# ---------------- RUN DETECTION ----------------
 
 if st.button("RUN AI DAMAGE DETECTION", use_container_width=True):
-    with st.spinner("AI model image analyse kar raha hai..."):
+    with st.spinner("AI model road image analyse kar raha hai..."):
         try:
             results = model.predict(
                 source=np.array(image),
                 conf=confidence,
                 verbose=False
             )
-
             result = results[0]
-            annotated_bgr = result.plot()
-            annotated_rgb = annotated_bgr[:, :, ::-1]
 
+            # Ultralytics plot result BGR mein hota hai; Streamlit ke liye RGB
+            annotated_rgb = result.plot()[:, :, ::-1]
             annotated_image = Image.fromarray(annotated_rgb)
+
             image_buffer = BytesIO()
             annotated_image.save(image_buffer, format="PNG")
 
-            detection_rows = []
+            detections = []
 
             for box in result.boxes:
                 class_id = int(box.cls[0].item())
-                class_name = model.names[class_id]
+                class_name = str(model.names[class_id])
                 conf_value = float(box.conf[0].item())
 
-                detection_rows.append({
-                    "Damage Class": str(class_name),
-                    "Confidence": f"{conf_value:.2%}",
-                    "Confidence Value": conf_value
+                detections.append({
+                    "damage_class": class_name,
+                    "confidence_value": conf_value
                 })
 
-            summary_rows = []
-            if detection_rows:
-                summary_df = pd.DataFrame(detection_rows)
-
-                for class_name, group in summary_df.groupby("Damage Class"):
-                    summary_rows.append({
-                        "Damage Class": class_name,
-                        "Count": len(group),
-                        "Average Confidence": group["Confidence Value"].mean()
+            summary = []
+            if detections:
+                detection_df = pd.DataFrame(detections)
+                for class_name, group in detection_df.groupby("damage_class"):
+                    summary.append({
+                        "damage_class": class_name,
+                        "count": len(group),
+                        "average_confidence": float(
+                            group["confidence_value"].mean()
+                        )
                     })
 
-                summary_rows.sort(
-                    key=lambda row: row["Count"],
+                summary.sort(
+                    key=lambda item: item["count"],
                     reverse=True
                 )
 
             st.session_state["analysis"] = {
                 "image_bytes": image_buffer.getvalue(),
-                "detections": detection_rows,
-                "summary": summary_rows,
-                "filename": uploaded_file.name,
-                "threshold": confidence
+                "detections": detections,
+                "summary": summary,
+                "threshold": confidence,
+                "filename": uploaded_file.name
             }
 
         except Exception as error:
@@ -427,76 +471,103 @@ analysis = st.session_state.get("analysis")
 
 if analysis is not None:
     detections = analysis["detections"]
-    total_detections = len(detections)
+    summary = analysis["summary"]
+    total = len(detections)
 
     average_confidence = (
-        sum(row["Confidence Value"] for row in detections) / total_detections
-        if total_detections else 0
+        sum(item["confidence_value"] for item in detections) / total
+        if total else 0
     )
 
     st.divider()
-    st.markdown('<div class="section-title">Detection Dashboard</div>',
-                unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-title">Detection Dashboard</div>',
+        unsafe_allow_html=True
+    )
 
-    metric1, metric2, metric3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Detections", total)
+    col2.metric("Damage Classes", len(summary))
+    col3.metric("Average Confidence", f"{average_confidence:.2%}")
 
-    metric1.metric("Total Detections", total_detections)
-    metric2.metric("Damage Classes", len(analysis["summary"]))
-    metric3.metric("Average Confidence", f"{average_confidence:.2%}")
+    st.caption(
+        f"Threshold used for this result: {analysis['threshold']:.2f}. "
+        "Threshold change karne ke baad dobara Run Detection dabayein."
+    )
 
     st.markdown("#### AI Detection Result")
     st.image(
         analysis["image_bytes"],
-        caption="Road image with predicted damage boxes",
+        caption="Predicted road damage boxes",
         use_container_width=True
     )
 
     st.markdown("#### Damage Class Analysis")
 
-    if analysis["summary"]:
-        summary_df = pd.DataFrame(analysis["summary"])
-        summary_df["Average Confidence"] = summary_df[
-            "Average Confidence"
+    if summary:
+        chart_col, table_col = st.columns([1, 1])
+
+        summary_df = pd.DataFrame(summary)
+        display_df = summary_df.copy()
+        display_df["Average Confidence"] = display_df[
+            "average_confidence"
         ].map(lambda value: f"{value:.2%}")
 
-        table_col, chart_col = st.columns([1, 1])
+        display_df = display_df.rename(columns={
+            "damage_class": "Damage Class",
+            "count": "Count"
+        })
+        display_df = display_df[
+            ["Damage Class", "Count", "Average Confidence"]
+        ]
+
+        with chart_col:
+            st.markdown("##### Detections by Class")
+            st.bar_chart(
+                summary_df.set_index("damage_class")["count"]
+            )
 
         with table_col:
+            st.markdown("##### Class Summary")
             st.dataframe(
-                summary_df,
+                display_df,
                 use_container_width=True,
                 hide_index=True
             )
 
-        with chart_col:
-            chart_data = pd.DataFrame(analysis["summary"])
-            st.bar_chart(
-                chart_data.set_index("Damage Class")["Count"]
-            )
-
         st.markdown("#### Individual Detections")
-        details_df = pd.DataFrame(detections)
-        details_df = details_df.drop(columns=["Confidence Value"])
+        detail_df = pd.DataFrame([
+            {
+                "Damage Class": item["damage_class"],
+                "Confidence": f"{item['confidence_value']:.2%}"
+            }
+            for item in detections
+        ])
         st.dataframe(
-            details_df,
+            detail_df,
             use_container_width=True,
             hide_index=True
         )
+
     else:
         st.warning(
-            "Is threshold par koi damage detect nahi hua. "
-            "Threshold kam karke ya doosri image ke saath try karein."
+            "Is threshold par koi damage detect nahi hua. Sidebar mein "
+            "threshold 0.05 karein aur RUN AI DAMAGE DETECTION dobara dabayein. "
+            "Agar phir bhi result nahi aata, model is image ko identify nahi "
+            "kar pa raha ho sakta hai."
         )
 
     st.divider()
-    st.markdown('<div class="section-title">Download Results</div>',
-                unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-title">Download Results</div>',
+        unsafe_allow_html=True
+    )
 
     download_col1, download_col2 = st.columns(2)
 
     with download_col1:
         st.download_button(
-            "Download Annotated Image",
+            label="Download Annotated Image",
             data=analysis["image_bytes"],
             file_name="road_damage_detected.png",
             mime="image/png",
@@ -505,16 +576,19 @@ if analysis is not None:
 
     with download_col2:
         try:
-            pdf_bytes = create_pdf_report(analysis)
+            pdf_data = create_pdf_report(analysis)
             st.download_button(
-                "Download PDF Report",
-                data=pdf_bytes,
+                label="Download PDF Report",
+                data=pdf_data,
                 file_name="road_damage_report.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )
         except Exception as error:
-            st.error(f"PDF report generate nahi hui: {error}")
+            st.error(
+                "PDF report nahi bani. requirements.txt mein reportlab "
+                f"check karein. Details: {error}"
+            )
 
 st.divider()
 st.markdown(
