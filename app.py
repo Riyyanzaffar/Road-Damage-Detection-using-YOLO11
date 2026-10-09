@@ -65,8 +65,3 @@ if uploaded_file is not None:
             st.warning(
                 "Koi damage detect nahi hua. Doosri road image try karein."
             )
-
-        st.subheader("Detected Road Damage")
-        st.image(output_image)
-
-        st.write("Detection complete!")
