@@ -17,7 +17,6 @@ st.set_page_config(
 )
 
 MODEL_PATH = Path(__file__).parent / "best (3).pt"
-
 # ---------------- PROFESSIONAL LIGHT/DARK-BLUE DESIGN ----------------
 
 st.markdown("""
