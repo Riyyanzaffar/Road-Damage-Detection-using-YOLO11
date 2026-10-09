@@ -12,8 +12,7 @@ st.set_page_config(
 
 st.title("Road Damage Detection")
 st.write("Upload a road image to detect cracks and road damage.")
-
-model_path = Path(__file__).parent / "best(3).pt"
+model_path = Path(__file__).parent / "best (3).pt"
 
 @st.cache_resource
 def load_model():
